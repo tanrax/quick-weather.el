@@ -140,8 +140,9 @@ The World Meteorological Organization (WMO) defines [[https://open-meteo.com/en/
 
 (defun sparkweather--wmo-code-info (code)
   "Get (icon description) for WMO CODE using Unicode weather glyphs."
-  (or (alist-get code sparkweather--wmo-codes-unicode)
-      '("?" "Unknown")))
+  (let ((info (or (alist-get code sparkweather--wmo-codes-unicode)
+                  '("?" "Unknown"))))
+    (list (car info) (downcase (cadr info)))))
 #+end_src
 
 
@@ -288,12 +289,22 @@ Special mode with keybindings for the weather display buffer.
 #+begin_src emacs-lisp
 (defvar-keymap sparkweather-mode-map
   :doc "Keymap for `sparkweather-mode'."
+  :parent tabulated-list-mode-map
   "q" #'quit-window
   "g" #'sparkweather-day)
 
-(define-derived-mode sparkweather-mode special-mode "Sparkweather"
+(easy-menu-define sparkweather-mode-menu sparkweather-mode-map
+  "Menu for Sparkweather mode."
+  '("Sparkweather"
+    ["Update" sparkweather-day]
+    ["Quit" quit-window]))
+
+(define-derived-mode sparkweather-mode tabulated-list-mode "Sparkweather"
   "Major mode for displaying weather forecasts with sparklines."
-  (setq buffer-read-only t))
+  (setq tabulated-list-format [("Range" 12 nil) ("Forecast" 0 nil)]
+        tabulated-list-padding 1
+        cursor-type nil)
+  (setq-local show-help-function nil))
 
 ;; Configure display to use minimal window height
 (add-to-list 'display-buffer-alist
@@ -333,28 +344,38 @@ Highlights lunch and commute hours."
          (lunch-info (when lunch-code (sparkweather--wmo-code-info lunch-code)))
          (commute-info (when commute-code (sparkweather--wmo-code-info commute-code)))
          (temp-sparkline (sparkweather--sparkline temps highlights current-hour))
-         (precipitation-sparkline (sparkweather--sparkline precipitation-probabilities highlights current-hour)))
+         (precipitation-sparkline (sparkweather--sparkline precipitation-probabilities highlights current-hour))
+         (rainy-weather-codes (cl-loop for row in data
+                                       when (> (nth 2 row) 0)
+                                       collect (nth 4 row)))
+         (worst-weather-code (when rainy-weather-codes (apply #'max rainy-weather-codes)))
+         (worst-weather-info (when worst-weather-code (sparkweather--wmo-code-info worst-weather-code)))
+         (entries nil))
+    (push (list 'temp (vector (format "%d—%d°C" (round temp-min) (round temp-max))
+                              temp-sparkline))
+          entries)
+    (when worst-weather-info
+      (push (list 'precip (vector (format "%d%% %s"
+                                          (round precipitation-max)
+                                          (car worst-weather-info))
+                                  precipitation-sparkline))
+            entries))
+    (when lunch-info
+      (push (list 'lunch (vector (concat (propertize "■" 'face 'success) " Lunch")
+                                 (format "%s %s" (car lunch-info) (cadr lunch-info))))
+            entries))
+    (when commute-info
+      (push (list 'commute (vector (concat (propertize "■" 'face 'warning) " Commute")
+                                   (format "%s %s" (car commute-info) (cadr commute-info))))
+            entries))
     (with-current-buffer (get-buffer-create sparkweather--buffer-name)
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert (propertize (format-time-string "%A %Y-%m-%d %H:%M") 'face 'bold) "\n\n")
-        (insert (format "%d—%d°C %s\n"
-                       (round temp-min)
-                       (round temp-max)
-                       temp-sparkline))
-        (unless (zerop precipitation-max)
-          (insert (format "%d—%d%% %s\n"
-                         (round precipitation-min)
-                         (round precipitation-max)
-                         precipitation-sparkline)))
-        (insert "\n")
-        (when lunch-info
-          (insert (propertize "■" 'face 'success))
-          (insert (format " %s %s\n" (car lunch-info) (cadr lunch-info))))
-        (when commute-info
-          (insert (propertize "■" 'face 'warning))
-          (insert (format " %s %s\n" (car commute-info) (cadr commute-info)))))
       (sparkweather-mode)
+      (setq tabulated-list-entries (nreverse entries)
+            tabulated-list-use-header-line nil)
+      (tabulated-list-print t)
+      (let ((inhibit-read-only t))
+        (goto-char (point-max))
+        (insert "\n" (propertize (format-time-string "%A %Y-%m-%d %H:%M") 'face 'bold)))
       (goto-char (point-min))
       (display-buffer (current-buffer)))))
 #+end_src

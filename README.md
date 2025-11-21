@@ -2,14 +2,19 @@
 
 Weather forecasts with sparklines for Emacs, using data from [Open-Meteo]( https://open-meteo.com).
 
+![screenshot](screenshot.png)
+
 ## Installation
+
+### [Elpaca](https://github.com/progfolio/elpaca)
 
 ```elisp
 (use-package sparkweather
-  :ensure t
-  :vc (:url "https://github.com/aglet/sparkweather.git"
-            :rev :newest))
+  :ensure (:host github :repo "aglet/sparkweather")
+  :after calendar)
 ```
+
+## Configuration
 
 Sparkweather uses the standard Emacs calendar location variables. If you haven't set these already:
 
@@ -17,6 +22,8 @@ Sparkweather uses the standard Emacs calendar location variables. If you haven't
 (setq calendar-latitude -41.3   ; Wellington, New Zealand
       calendar-longitude 174.8)
 ```
+
+For other configuration, `M-x customize-group` / `sparkweather`.
 
 ## Usage
 
