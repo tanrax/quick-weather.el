@@ -12,7 +12,7 @@
 
 ;; Author: Robin Stephenson <robin@aglet.net>
 ;; Keywords: convenience, weather
-;; Version: 0.1.1
+;; Version: 0.1.2
 ;; Package-Requires: ((emacs "29.1"))
 ;; URL: https://github.com/aglet/sparkweather
 
@@ -375,7 +375,7 @@ Highlights lunch and commute hours."
       (tabulated-list-print t)
       (let ((inhibit-read-only t))
         (goto-char (point-max))
-        (insert "\n" (propertize (format-time-string "%A %F %R") 'face 'bold)))
+        (insert "\n" (format-time-string "%A %F %R")))
       (goto-char (point-min))
       (display-buffer (current-buffer)))))
 #+end_src

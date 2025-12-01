@@ -1,10 +1,14 @@
 # `sparkweather`
 
+![GitHub License](https://img.shields.io/github/license/aglet/sparkweather) [![MELPA](https://melpa.org/packages/sparkweather-badge.svg)](https://melpa.org/#/sparkweather)
+
 Weather forecasts with sparklines for Emacs, using data from [Open-Meteo]( https://open-meteo.com).
 
 ![screenshot](screenshot.png)
 
 ## Installation
+
+Sparkweather is available in [MELPA](https://melpa.org/#/getting-started).
 
 ### [Elpaca](https://github.com/progfolio/elpaca)
 

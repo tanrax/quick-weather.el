@@ -1,0 +1,7 @@
+2025-12-01  Robin Stephenson  <robin.stephenson@ticketmaster.com>
+
+	* README.md: Add license and MELPA badges.
+
+	* sparkweather.el (sparkweather--display-day): Remove bold formatting for date.
+
+	* ChangeLog: Add change log.
