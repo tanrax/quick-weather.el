@@ -8,21 +8,13 @@ Quick weather forecasts with sparklines for Emacs, using data from [Open-Meteo](
 
 ## Installation
 
-### Manual Installation
-
-Clone this repository and add to your Emacs configuration:
-
-```elisp
-(add-to-list 'load-path "/path/to/quick-weather.el")
-(require 'quick-weather)
-```
-
-### [Elpaca](https://github.com/progfolio/elpaca)
-
 ```elisp
 (use-package quick-weather
-  :ensure (:host github :repo "tanrax/quick-weather.el")
-  :after calendar)
+  :ensure t
+  :after calendar
+  :config
+  (setq calendar-latitude 39.46975   ; Valencia, Spain
+        calendar-longitude -0.37739))
 ```
 
 ## Configuration
