@@ -1,14 +1,16 @@
-;;; sparkweather.el --- Weather forecasts with sparklines -*- lexical-binding: t; -*-
+;;; quick-weather.el --- Quick weather forecasts with sparklines -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2025 Robin Stephenson. All rights reserved.
+;; Copyright (C) 2025 Andros Fenollosa. All rights reserved.
 
-;; Author: Robin Stephenson <robin@aglet.net>
-;; Maintainer: Robin Stephenson <robin@aglet.net>
-;; Contributors: Andros Fenollosa <hi@andros.dev>
+;; Author: Andros Fenollosa <hi@andros.dev>
+;; Maintainer: Andros Fenollosa <hi@andros.dev>
 ;; Keywords: convenience, weather
-;; Version: 0.1.2
+;; Version: 1.0.0
 ;; Package-Requires: ((emacs "29.1"))
-;; URL: https://github.com/aglet/sparkweather
+;; URL: https://github.com/tanrax/quick-weather.el
+
+;; This package is a fork of sparkweather by Robin Stephenson <robin@aglet.net>
+;; Original: https://github.com/aglet/sparkweather
 
 ;; Permission is hereby granted, free of charge, to any person obtaining a copy
 ;; of this  software and  associated documentation  files (the  "Software"), to
@@ -16,10 +18,10 @@
 ;; rights to use, copy, modify,  merge, publish, distribute, sublicense, and/or
 ;; sell copies of the  Software, and to permit persons to  whom the Software is
 ;; furnished to do so, subject to the following conditions:
-;; 
+;;
 ;; The above copyright  notice and this permission notice shall  be included in
 ;; all copies or substantial portions of the Software.
-;; 
+;;
 ;; THE SOFTWARE IS  PROVIDED "AS IS", WITHOUT WARRANTY OF  ANY KIND, EXPRESS OR
 ;; IMPLIED, INCLUDING  BUT NOT  LIMITED TO  THE WARRANTIES  OF MERCHANTABILITY,
 ;; FITNESS FOR A PARTICULAR PURPOSE AND  NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -27,25 +29,25 @@
 ;; LIABILITY,  WHETHER IN  AN ACTION  OF CONTRACT,  TORT OR  OTHERWISE, ARISING
 ;; FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 ;; IN THE SOFTWARE.
-;; 
+;;
 
 ;;; Commentary:
 
-;; This package provides a simple weather forecast display using
-;; sparklines.
+;; This package provides a quick weather forecast display using sparklines
+;; with a minimal brackets UI design.
 ;;
 ;; Commands:
-;; - `sparkweather-day': Show full day forecast with sparklines
-;; - `sparkweather': Alias for `sparkweather-day'
+;; - `quick-weather-day': Show full day forecast with sparklines
+;; - `quick-weather': Alias for `quick-weather-day'
 ;;
 ;; Configuration:
 ;; The package uses `calendar-latitude' and `calendar-longitude' for
 ;; the forecast location.
 ;;
 ;; The sparkline display highlights lunch and commute time windows,
-;; which can be configured via `sparkweather-lunch-start-hour',
-;; `sparkweather-lunch-end-hour', `sparkweather-commute-start-hour',
-;; and `sparkweather-commute-end-hour'.
+;; which can be configured via `quick-weather-lunch-start-hour',
+;; `quick-weather-lunch-end-hour', `quick-weather-commute-start-hour',
+;; and `quick-weather-commute-end-hour'.
 ;;
 ;; Weather icons use Unicode weather glyphs from the Miscellaneous
 ;; Symbols block for broad compatibility.
@@ -61,45 +63,45 @@
 (require 'iso8601)
 (require 'solar)
 
-(defgroup sparkweather nil
-  "Weather forecasts with sparklines."
+(defgroup quick-weather nil
+  "Quick weather forecasts with sparklines."
   :group 'calendar
-  :prefix "sparkweather-")
+  :prefix "quick-weather-")
 
-(defun sparkweather--validate-hour (symbol value)
+(defun quick-weather--validate-hour (symbol value)
   "Validate that VALUE is a valid hour (0-23) for SYMBOL."
   (unless (and (integerp value) (>= value 0) (<= value 23))
     (user-error "Hour must be 0-23, got %s" value))
   (set-default symbol value))
 
-(defcustom sparkweather-lunch-start-hour 12
+(defcustom quick-weather-lunch-start-hour 12
   "Start hour for lunch time window (24-hour format, 0-23)."
   :type 'integer
-  :set #'sparkweather--validate-hour
-  :group 'sparkweather)
+  :set #'quick-weather--validate-hour
+  :group 'quick-weather)
 
-(defcustom sparkweather-lunch-end-hour 14
+(defcustom quick-weather-lunch-end-hour 14
   "End hour for lunch time window (24-hour format, 0-23)."
   :type 'integer
-  :set #'sparkweather--validate-hour
-  :group 'sparkweather)
+  :set #'quick-weather--validate-hour
+  :group 'quick-weather)
 
-(defcustom sparkweather-commute-start-hour 17
+(defcustom quick-weather-commute-start-hour 17
   "Start hour for commute time window (24-hour format, 0-23)."
   :type 'integer
-  :set #'sparkweather--validate-hour
-  :group 'sparkweather)
+  :set #'quick-weather--validate-hour
+  :group 'quick-weather)
 
-(defcustom sparkweather-commute-end-hour 19
+(defcustom quick-weather-commute-end-hour 19
   "End hour for commute time window (24-hour format, 0-23)."
   :type 'integer
-  :set #'sparkweather--validate-hour
-  :group 'sparkweather)
+  :set #'quick-weather--validate-hour
+  :group 'quick-weather)
 
-(defconst sparkweather--buffer-name "*Sparkweather*"
+(defconst quick-weather--buffer-name "*Quick-Weather*"
   "Name of buffer used to display weather forecasts.")
 
-(defconst sparkweather--wmo-codes-unicode
+(defconst quick-weather--wmo-codes-unicode
   '((0 . ("☀" "Clear sky"))
     (1 . ("☀" "Mainly clear"))
     (2 . ("⛅" "Partly cloudy"))
@@ -130,13 +132,13 @@
     (99 . ("⛈" "Thunderstorm with heavy hail")))
   "WMO weather code to (glyph description) mapping from Miscellaneous Symbols.")
 
-(defun sparkweather--wmo-code-info (code)
+(defun quick-weather--wmo-code-info (code)
   "Get (icon description) for WMO CODE using Unicode weather glyphs."
-  (let ((info (or (alist-get code sparkweather--wmo-codes-unicode)
+  (let ((info (or (alist-get code quick-weather--wmo-codes-unicode)
                   '("?" "Unknown"))))
     (list (car info) (downcase (cadr info)))))
 
-(defun sparkweather--process-day-response (status callback)
+(defun quick-weather--process-day-response (status callback)
   "Process weather API response for full day and call CALLBACK with results.
 STATUS is the `url-retrieve` status parameter."
   (condition-case err
@@ -192,7 +194,7 @@ STATUS is the `url-retrieve` status parameter."
      (kill-buffer)
      (message "Weather fetch failed: %s" (error-message-string err)))))
 
-(defun sparkweather--fetch-day (callback)
+(defun quick-weather--fetch-day (callback)
   "Fetch full day weather for calendar location and call CALLBACK with results."
   (unless (numberp calendar-latitude)
     (error "Calendar location not set.  Set `calendar-latitude' and `calendar-longitude'"))
@@ -205,11 +207,11 @@ STATUS is the `url-retrieve` status parameter."
   (let ((url (format "https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&current=temperature_2m,weather_code&hourly=temperature_2m,precipitation_probability,precipitation,weather_code&timezone=auto&forecast_days=1"
                     calendar-latitude calendar-longitude)))
     (url-retrieve url
-                  #'sparkweather--process-day-response
+                  #'quick-weather--process-day-response
                   (list callback)
                   t)))
 
-(defun sparkweather--time-window-data (data start-hour end-hour)
+(defun quick-weather--time-window-data (data start-hour end-hour)
   "Extract weather data from DATA for hours between START-HOUR and END-HOUR.
 Returns (indices weather-codes) where indices is an alist for sparkline
 highlighting and weather-codes is a list of WMO codes for averaging."
@@ -223,7 +225,7 @@ highlighting and weather-codes is a list of WMO codes for averaging."
             finally (setq weather-codes codes))
     (list (nreverse indices) weather-codes)))
 
-(defun sparkweather--sparkline (values &optional highlights current-hour)
+(defun quick-weather--sparkline (values &optional highlights current-hour)
   "Generate sparkline from VALUES.
 HIGHLIGHTS is an alist of (index . face) to highlight specific positions.
 CURRENT-HOUR, if provided, inserts a narrow no-break space before that hour."
@@ -249,19 +251,19 @@ CURRENT-HOUR, if provided, inserts a narrow no-break space before that hour."
                                  (propertize char 'face face)
                                char))))))
 
-(defvar-keymap sparkweather-mode-map
-  :doc "Keymap for `sparkweather-mode'."
+(defvar-keymap quick-weather-mode-map
+  :doc "Keymap for `quick-weather-mode'."
   :parent tabulated-list-mode-map
   "q" #'quit-window
-  "g" #'sparkweather-day)
+  "g" #'quick-weather-day)
 
-(easy-menu-define sparkweather-mode-menu sparkweather-mode-map
-  "Menu for Sparkweather mode."
-  '("Sparkweather"
-    ["Update" sparkweather-day]
+(easy-menu-define quick-weather-mode-menu quick-weather-mode-map
+  "Menu for Quick-Weather mode."
+  '("Quick-Weather"
+    ["Update" quick-weather-day]
     ["Quit" quit-window]))
 
-(define-derived-mode sparkweather-mode tabulated-list-mode "Sparkweather"
+(define-derived-mode quick-weather-mode tabulated-list-mode "Quick-Weather"
   "Major mode for displaying weather forecasts with sparklines."
   (setq tabulated-list-format [("" 0 nil) ("" 0 nil)]
         tabulated-list-padding 0
@@ -270,50 +272,50 @@ CURRENT-HOUR, if provided, inserts a narrow no-break space before that hour."
 
 ;; Configure display to use minimal window height
 (add-to-list 'display-buffer-alist
-             `(,(regexp-quote sparkweather--buffer-name)
+             `(,(regexp-quote quick-weather--buffer-name)
                (display-buffer-reuse-window display-buffer-below-selected)
                (window-height . ,(lambda (window)
                                    (fit-window-to-buffer window)
                                    (window-resize window 1)))
                (body-function . ,#'select-window)))
 
-(defun sparkweather--display-day (data)
+(defun quick-weather--display-day (data)
   "Display full day weather DATA with sparklines.
 DATA is a list of (current-temp current-weather-code hourly-data).
 Highlights lunch and commute hours."
   (let* ((current-temp (car data))
          (current-weather-code (cadr data))
          (hourly-data (caddr data))
-         (current-weather-info (sparkweather--wmo-code-info current-weather-code))
+         (current-weather-info (quick-weather--wmo-code-info current-weather-code))
          (current-hour (decoded-time-hour (decode-time)))
          (temps (mapcar #'cadr hourly-data))
          (precipitation-probabilities (mapcar #'caddr hourly-data))
          (temp-min (apply #'min temps))
          (temp-max (apply #'max temps))
          (precipitation-max (apply #'max precipitation-probabilities))
-         (lunch-data (sparkweather--time-window-data hourly-data
-                                                     sparkweather-lunch-start-hour
-                                                     sparkweather-lunch-end-hour))
+         (lunch-data (quick-weather--time-window-data hourly-data
+                                                     quick-weather-lunch-start-hour
+                                                     quick-weather-lunch-end-hour))
          (lunch-indices (mapcar (lambda (pair) (cons (car pair) 'success)) (car lunch-data)))
          (lunch-weather (cadr lunch-data))
-         (commute-data (sparkweather--time-window-data hourly-data
-                                                       sparkweather-commute-start-hour
-                                                       sparkweather-commute-end-hour))
+         (commute-data (quick-weather--time-window-data hourly-data
+                                                       quick-weather-commute-start-hour
+                                                       quick-weather-commute-end-hour))
          (commute-indices (mapcar (lambda (pair) (cons (car pair) 'warning)) (car commute-data)))
          (commute-weather (cadr commute-data))
          (highlights (append lunch-indices commute-indices))
          ;; Use worst weather (highest WMO code) for each time window
          (lunch-code (when lunch-weather (apply #'max lunch-weather)))
          (commute-code (when commute-weather (apply #'max commute-weather)))
-         (lunch-info (when lunch-code (sparkweather--wmo-code-info lunch-code)))
-         (commute-info (when commute-code (sparkweather--wmo-code-info commute-code)))
-         (temp-sparkline (sparkweather--sparkline temps highlights current-hour))
-         (precipitation-sparkline (sparkweather--sparkline precipitation-probabilities highlights current-hour))
+         (lunch-info (when lunch-code (quick-weather--wmo-code-info lunch-code)))
+         (commute-info (when commute-code (quick-weather--wmo-code-info commute-code)))
+         (temp-sparkline (quick-weather--sparkline temps highlights current-hour))
+         (precipitation-sparkline (quick-weather--sparkline precipitation-probabilities highlights current-hour))
          (rainy-weather-codes (cl-loop for row in hourly-data
                                        when (> (nth 2 row) 0)
                                        collect (nth 4 row)))
          (worst-weather-code (when rainy-weather-codes (apply #'max rainy-weather-codes)))
-         (worst-weather-info (when worst-weather-code (sparkweather--wmo-code-info worst-weather-code)))
+         (worst-weather-info (when worst-weather-code (quick-weather--wmo-code-info worst-weather-code)))
          (entries nil)
          (separator (propertize "───────────────────────────────────────────────────────" 'face 'shadow)))
     ;; Top padding
@@ -364,8 +366,8 @@ Highlights lunch and commute hours."
       (push (list 'lunch (vector ""
                                  (concat (propertize "[ " 'face 'font-lock-keyword-face)
                                          (propertize (format "%02d-%02d LUNCH"
-                                                            sparkweather-lunch-start-hour
-                                                            sparkweather-lunch-end-hour)
+                                                            quick-weather-lunch-start-hour
+                                                            quick-weather-lunch-end-hour)
                                                     'face 'success)
                                          (propertize " ]" 'face 'font-lock-keyword-face)
                                          " "
@@ -376,8 +378,8 @@ Highlights lunch and commute hours."
       (push (list 'commute (vector ""
                                    (concat (propertize "[ " 'face 'font-lock-keyword-face)
                                            (propertize (format "%02d-%02d COMMUTE"
-                                                              sparkweather-commute-start-hour
-                                                              sparkweather-commute-end-hour)
+                                                              quick-weather-commute-start-hour
+                                                              quick-weather-commute-end-hour)
                                                       'face 'warning)
                                            (propertize " ]" 'face 'font-lock-keyword-face)
                                            " "
@@ -386,8 +388,8 @@ Highlights lunch and commute hours."
     ;; Bottom padding
     (push (list 'bottom-space (vector "" ""))
           entries)
-    (with-current-buffer (get-buffer-create sparkweather--buffer-name)
-      (sparkweather-mode)
+    (with-current-buffer (get-buffer-create quick-weather--buffer-name)
+      (quick-weather-mode)
       (setq tabulated-list-entries (nreverse entries)
             tabulated-list-use-header-line nil)
       (tabulated-list-print t)
@@ -395,16 +397,16 @@ Highlights lunch and commute hours."
       (display-buffer (current-buffer)))))
 
 ;;;###autoload
-(defun sparkweather-day ()
+(defun quick-weather-day ()
   "Show full day weather with sparklines."
   (interactive)
-  (sparkweather--fetch-day
+  (quick-weather--fetch-day
    (lambda (data)
-     (sparkweather--display-day data))))
+     (quick-weather--display-day data))))
 
 ;;;###autoload
-(defalias 'sparkweather #'sparkweather-day)
+(defalias 'quick-weather #'quick-weather-day)
 
-(provide 'sparkweather)
+(provide 'quick-weather)
 
-;;; sparkweather.el ends here
+;;; quick-weather.el ends here
