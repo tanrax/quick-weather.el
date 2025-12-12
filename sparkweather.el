@@ -263,8 +263,8 @@ CURRENT-HOUR, if provided, inserts a narrow no-break space before that hour."
 
 (define-derived-mode sparkweather-mode tabulated-list-mode "Sparkweather"
   "Major mode for displaying weather forecasts with sparklines."
-  (setq tabulated-list-format [("Range" 12 nil) ("Forecast" 0 nil)]
-        tabulated-list-padding 1
+  (setq tabulated-list-format [("" 0 nil) ("" 0 nil)]
+        tabulated-list-padding 0
         cursor-type nil)
   (setq-local show-help-function nil))
 
@@ -272,7 +272,9 @@ CURRENT-HOUR, if provided, inserts a narrow no-break space before that hour."
 (add-to-list 'display-buffer-alist
              `(,(regexp-quote sparkweather--buffer-name)
                (display-buffer-reuse-window display-buffer-below-selected)
-               (window-height . fit-window-to-buffer)
+               (window-height . ,(lambda (window)
+                                   (fit-window-to-buffer window)
+                                   (window-resize window 1)))
                (body-function . ,#'select-window)))
 
 (defun sparkweather--display-day (data)
@@ -312,30 +314,78 @@ Highlights lunch and commute hours."
                                        collect (nth 4 row)))
          (worst-weather-code (when rainy-weather-codes (apply #'max rainy-weather-codes)))
          (worst-weather-info (when worst-weather-code (sparkweather--wmo-code-info worst-weather-code)))
-         (entries nil))
-    (push (list 'current (vector "Current"
-                                 (format "%d°C %s %s"
-                                         (round current-temp)
+         (entries nil)
+         (separator (propertize "───────────────────────────────────────────────────────" 'face 'shadow)))
+    ;; Top padding
+    (push (list 'top-space (vector "" ""))
+          entries)
+    ;; Current weather
+    (push (list 'current (vector ""
+                                 (concat (propertize "[ CURRENT ]" 'face 'font-lock-keyword-face)
+                                         " "
+                                         (propertize (format "%d°C" (round current-temp)) 'face 'bold)
+                                         " "
                                          (car current-weather-info)
+                                         " "
                                          (cadr current-weather-info))))
           entries)
-    (push (list 'temp (vector (format "%d—%d°C" (round temp-min) (round temp-max))
-                              temp-sparkline))
+    ;; Separator
+    (push (list 'sep1 (vector "" separator))
           entries)
+    ;; Temperature range
+    (push (list 'temp (vector ""
+                              (concat (propertize "[" 'face 'font-lock-keyword-face)
+                                      " "
+                                      (propertize (format "%d—%d°C" (round temp-min) (round temp-max))
+                                                  'face 'bold)
+                                      " "
+                                      (propertize "]" 'face 'font-lock-keyword-face)
+                                      " "
+                                      temp-sparkline)))
+          entries)
+    ;; Precipitation
     (when worst-weather-info
-      (push (list 'precip (vector (format "%d%% %s"
-                                          (round precipitation-max)
-                                          (car worst-weather-info))
-                                  precipitation-sparkline))
+      (push (list 'precip (vector ""
+                                  (concat (propertize "[" 'face 'font-lock-keyword-face)
+                                          " "
+                                          (propertize (format "%3d%% %s" (round precipitation-max) (car worst-weather-info))
+                                                      'face 'bold)
+                                          " "
+                                          (propertize "]" 'face 'font-lock-keyword-face)
+                                          " "
+                                          precipitation-sparkline)))
             entries))
+    ;; Separator before time windows
+    (when (or lunch-info commute-info)
+      (push (list 'sep2 (vector "" separator))
+            entries))
+    ;; Lunch time window
     (when lunch-info
-      (push (list 'lunch (vector (concat (propertize "■" 'face 'success) " Lunch")
-                                 (format "%s %s" (car lunch-info) (cadr lunch-info))))
+      (push (list 'lunch (vector ""
+                                 (concat (propertize "[ " 'face 'font-lock-keyword-face)
+                                         (propertize (format "%02d-%02d LUNCH"
+                                                            sparkweather-lunch-start-hour
+                                                            sparkweather-lunch-end-hour)
+                                                    'face 'success)
+                                         (propertize " ]" 'face 'font-lock-keyword-face)
+                                         " "
+                                         (format "%s %s" (car lunch-info) (cadr lunch-info)))))
             entries))
+    ;; Commute time window
     (when commute-info
-      (push (list 'commute (vector (concat (propertize "■" 'face 'warning) " Commute")
-                                   (format "%s %s" (car commute-info) (cadr commute-info))))
+      (push (list 'commute (vector ""
+                                   (concat (propertize "[ " 'face 'font-lock-keyword-face)
+                                           (propertize (format "%02d-%02d COMMUTE"
+                                                              sparkweather-commute-start-hour
+                                                              sparkweather-commute-end-hour)
+                                                      'face 'warning)
+                                           (propertize " ]" 'face 'font-lock-keyword-face)
+                                           " "
+                                           (format "%s %s" (car commute-info) (cadr commute-info)))))
             entries))
+    ;; Bottom padding
+    (push (list 'bottom-space (vector "" ""))
+          entries)
     (with-current-buffer (get-buffer-create sparkweather--buffer-name)
       (sparkweather-mode)
       (setq tabulated-list-entries (nreverse entries)
