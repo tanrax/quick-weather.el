@@ -1,12 +1,10 @@
 # `quick-weather`
 
-![GitHub License](https://img.shields.io/github/license/tanrax/quick-weather.el)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 > **Note:** This is a fork of [aglet/sparkweather](https://github.com/aglet/sparkweather) with a different UI design featuring a minimal brackets style and current weather display.
 
 Quick weather forecasts with sparklines for Emacs, using data from [Open-Meteo](https://open-meteo.com).
-
-![screenshot](screenshot.png)
 
 ## Installation
 
@@ -54,4 +52,4 @@ Press `g` to refresh, `q` to close.
 
 ## License
 
-[MIT](LICENSE)
+[GPL-3.0](LICENSE)
