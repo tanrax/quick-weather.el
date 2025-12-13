@@ -36,8 +36,8 @@ Quick weather forecasts with sparklines for Emacs, using data from [Open-Meteo](
 Set your location using standard Emacs calendar variables:
 
 ```elisp
-(setq calendar-latitude -41.3   ; Wellington, New Zealand
-      calendar-longitude 174.8)
+(setq calendar-latitude 39.46975   ; Valencia, Spain
+      calendar-longitude -0.37739)
 ```
 
 ### Time Markers
