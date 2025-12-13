@@ -39,10 +39,9 @@
 ;; The package uses `calendar-latitude' and `calendar-longitude' for
 ;; the forecast location.
 ;;
-;; The sparkline display highlights lunch and commute time windows,
-;; which can be configured via `quick-weather-lunch-start-hour',
-;; `quick-weather-lunch-end-hour', `quick-weather-commute-start-hour',
-;; and `quick-weather-commute-end-hour'.
+;; Time markers can be configured via `quick-weather-time-windows'.
+;; You can define zero or more time markers to highlight in the
+;; sparkline display.
 ;;
 ;; Weather icons use Unicode weather glyphs from the Miscellaneous
 ;; Symbols block for broad compatibility.
@@ -70,63 +69,73 @@
   (set-default symbol value))
 
 (defcustom quick-weather-lunch-start-hour 12
-  "Start hour for lunch time window (24-hour format, 0-23)."
+  "Start hour for lunch time window (24-hour format, 0-23).
+
+DEPRECATED: Use `quick-weather-time-windows' instead."
   :type 'integer
   :set #'quick-weather--validate-hour
   :group 'quick-weather)
 
 (defcustom quick-weather-lunch-end-hour 14
-  "End hour for lunch time window (24-hour format, 0-23)."
+  "End hour for lunch time window (24-hour format, 0-23).
+
+DEPRECATED: Use `quick-weather-time-windows' instead."
   :type 'integer
   :set #'quick-weather--validate-hour
   :group 'quick-weather)
 
 (defcustom quick-weather-commute-start-hour 17
-  "Start hour for commute time window (24-hour format, 0-23)."
+  "Start hour for commute time window (24-hour format, 0-23).
+
+DEPRECATED: Use `quick-weather-time-windows' instead."
   :type 'integer
   :set #'quick-weather--validate-hour
   :group 'quick-weather)
 
 (defcustom quick-weather-commute-end-hour 19
-  "End hour for commute time window (24-hour format, 0-23)."
+  "End hour for commute time window (24-hour format, 0-23).
+
+DEPRECATED: Use `quick-weather-time-windows' instead."
   :type 'integer
   :set #'quick-weather--validate-hour
   :group 'quick-weather)
 
-(defcustom quick-weather-time-windows nil
-  "List of time windows to highlight in weather forecast.
-Each element is a list of (LABEL START-HOUR END-HOUR FACE).
+(defcustom quick-weather-time-windows
+  '(("LUNCH"   13 success)
+    ("COMMUTE" 17 warning))
+  "List of time markers to highlight in weather forecast.
+Each element is a list of (LABEL HOUR FACE).
 LABEL is a string to display (e.g., \"LUNCH\", \"COMMUTE\").
-START-HOUR and END-HOUR are integers (0-23).
+HOUR is an integer (0-23) representing the specific hour to mark.
 FACE is a face symbol for highlighting (e.g., success, warning, error).
 
-Example:
-  (setq quick-weather-time-windows
-    \\='((\"LUNCH\"    12 14 success)
-      (\"COMMUTE\"  17 19 warning)))
+Examples:
+  ;; No time markers
+  (setq quick-weather-time-windows \\='())
 
-If nil, uses the default lunch and commute hours from the
-individual quick-weather-*-hour variables for backward compatibility."
+  ;; One time marker
+  (setq quick-weather-time-windows
+    \\='((\"LUNCH\" 13 success)))
+
+  ;; Multiple time markers
+  (setq quick-weather-time-windows
+    \\='((\"BREAKFAST\"  7 success)
+      (\"LUNCH\"      13 success)
+      (\"DINNER\"     20 warning)
+      (\"BEDTIME\"    23 error)))
+
+  ;; With emojis
+  (setq quick-weather-time-windows
+    \\='((\"🍽️\" 13 success)
+      (\"🚌\" 17 warning)))"
   :type '(repeat (list (string :tag "Label")
-                      (integer :tag "Start Hour (0-23)")
-                      (integer :tag "End Hour (0-23)")
+                      (integer :tag "Hour (0-23)")
                       (symbol :tag "Face")))
   :group 'quick-weather)
 
 (defun quick-weather--get-time-windows ()
-  "Get time windows to display.
-If `quick-weather-time-windows' is set, use it.
-Otherwise, fall back to individual lunch/commute variables for
-backward compatibility."
-  (or quick-weather-time-windows
-      (list (list "LUNCH"
-                  quick-weather-lunch-start-hour
-                  quick-weather-lunch-end-hour
-                  'success)
-            (list "COMMUTE"
-                  quick-weather-commute-start-hour
-                  quick-weather-commute-end-hour
-                  'warning))))
+  "Get time windows to display from `quick-weather-time-windows'."
+  quick-weather-time-windows)
 
 (defconst quick-weather--buffer-name "*Quick-Weather*"
   "Name of buffer used to display weather forecasts.")
@@ -241,19 +250,19 @@ STATUS is the `url-retrieve` status parameter."
                   (list callback)
                   t)))
 
-(defun quick-weather--time-window-data (data start-hour end-hour)
-  "Extract weather data from DATA for hours between START-HOUR and END-HOUR.
-Returns (indices weather-codes) where indices is an alist for sparkline
-highlighting and weather-codes is a list of WMO codes for averaging."
-  (let ((indices nil)
-        (weather-codes nil))
+(defun quick-weather--time-window-data (data hour)
+  "Extract weather data from DATA for a specific HOUR.
+Returns (index weather-code) where index is the position in the data
+and weather-code is the WMO code for that hour."
+  (let ((index nil)
+        (weather-code nil))
     (cl-loop for row in data
             for i from 0
-            when (and (>= (car row) start-hour) (< (car row) end-hour))
-            do (push (cons i nil) indices)
-            and collect (nth 4 row) into codes
-            finally (setq weather-codes codes))
-    (list (nreverse indices) weather-codes)))
+            when (= (car row) hour)
+            do (setq index i
+                     weather-code (nth 4 row))
+            and return t)
+    (list index weather-code)))
 
 (defun quick-weather--sparkline (values &optional highlights current-hour)
   "Generate sparkline from VALUES.
@@ -312,7 +321,7 @@ CURRENT-HOUR, if provided, inserts a narrow no-break space before that hour."
 (defun quick-weather--display-day (data)
   "Display full day weather DATA with sparklines.
 DATA is a list of (current-temp current-weather-code hourly-data).
-Highlights lunch and commute hours."
+Highlights configured time markers."
   (let* ((current-temp (car data))
          (current-weather-code (cadr data))
          (hourly-data (caddr data))
@@ -324,20 +333,22 @@ Highlights lunch and commute hours."
          (temp-max (apply #'max temps))
          (precipitation-max (apply #'max precipitation-probabilities))
          (time-windows (quick-weather--get-time-windows))
-         ;; Process all time windows
+         ;; Process all time markers
          (windows-data (cl-loop for window in time-windows
                                for label = (nth 0 window)
-                               for start-hour = (nth 1 window)
-                               for end-hour = (nth 2 window)
-                               for face = (nth 3 window)
-                               for window-data = (quick-weather--time-window-data hourly-data start-hour end-hour)
-                               for indices = (mapcar (lambda (pair) (cons (car pair) face)) (car window-data))
-                               for weather = (cadr window-data)
-                               for code = (when weather (apply #'max weather))
+                               for hour = (nth 1 window)
+                               for face = (nth 2 window)
+                               for window-data = (quick-weather--time-window-data hourly-data hour)
+                               for index = (car window-data)
+                               for code = (cadr window-data)
                                for info = (when code (quick-weather--wmo-code-info code))
-                               collect (list label start-hour end-hour face indices info)))
+                               collect (list label hour face index info)))
          ;; Collect all highlights for sparklines
-         (highlights (apply #'append (mapcar (lambda (w) (nth 4 w)) windows-data)))
+         (highlights (cl-loop for w in windows-data
+                             for index = (nth 3 w)
+                             for face = (nth 2 w)
+                             when index
+                             collect (cons index face)))
          (temp-sparkline (quick-weather--sparkline temps highlights current-hour))
          (precipitation-sparkline (quick-weather--sparkline precipitation-probabilities highlights current-hour))
          (rainy-weather-codes (cl-loop for row in hourly-data
@@ -352,16 +363,21 @@ Highlights lunch and commute hours."
           entries)
     ;; Current weather
     (push (list 'current (vector ""
-                                 (concat (propertize "[ CURRENT ]" 'face 'font-lock-keyword-face)
+                                 (concat " "
+                                         (propertize "[ NOW ]" 'face 'font-lock-keyword-face)
                                          " "
                                          (propertize (format "%d°C" (round current-temp)) 'face 'bold)
-                                         " "
+                                         " - "
                                          (car current-weather-info)
                                          " "
                                          (cadr current-weather-info))))
           entries)
     ;; Separator
     (push (list 'sep1 (vector "" separator))
+          entries)
+    ;; Forecast header
+    (push (list 'forecast-header (vector "" (concat (make-string 45 ?\s)
+                                                    (propertize "FORECAST" 'face 'shadow))))
           entries)
     ;; Temperature range
     (push (list 'temp (vector ""
@@ -386,24 +402,26 @@ Highlights lunch and commute hours."
                                           " "
                                           precipitation-sparkline)))
             entries))
-    ;; Separator before time windows
-    (when (cl-some (lambda (w) (nth 5 w)) windows-data)
+    ;; Separator before time markers
+    (when (cl-some (lambda (w) (nth 4 w)) windows-data)
       (push (list 'sep2 (vector "" separator))
+            entries)
+      ;; Markers header
+      (push (list 'markers-header (vector "" (concat (make-string 48 ?\s)
+                                                      (propertize "MARKERS" 'face 'shadow))))
             entries))
-    ;; Time windows (lunch, commute, etc.)
+    ;; Time markers (lunch, commute, etc.)
     (cl-loop for window in windows-data
             for label = (nth 0 window)
-            for start-hour = (nth 1 window)
-            for end-hour = (nth 2 window)
-            for face = (nth 3 window)
-            for info = (nth 5 window)
+            for hour = (nth 1 window)
+            for face = (nth 2 window)
+            for info = (nth 4 window)
             when info
             do (push (list (intern (downcase label))
                           (vector ""
                                   (concat (propertize "[ " 'face 'font-lock-keyword-face)
-                                          (propertize (format "%02d-%02d %s"
-                                                             start-hour
-                                                             end-hour
+                                          (propertize (format "%02d %s"
+                                                             hour
                                                              label)
                                                      'face face)
                                           (propertize " ]" 'face 'font-lock-keyword-face)
