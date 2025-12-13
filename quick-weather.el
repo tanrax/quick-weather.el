@@ -363,8 +363,7 @@ Highlights configured time markers."
           entries)
     ;; Current weather
     (push (list 'current (vector ""
-                                 (concat " "
-                                         (propertize "[ NOW ]" 'face 'font-lock-keyword-face)
+                                 (concat (propertize "[ NOW ]" 'face 'font-lock-keyword-face)
                                          " "
                                          (propertize (format "%d°C" (round current-temp)) 'face 'bold)
                                          " - "
@@ -377,7 +376,7 @@ Highlights configured time markers."
           entries)
     ;; Forecast header
     (push (list 'forecast-header (vector "" (concat (make-string 47 ?\s)
-                                                    (propertize "FORECAST" 'face 'shadow))))
+                                                    (propertize "FORECAST" 'face 'font-lock-keyword-face))))
           entries)
     ;; Temperature range
     (push (list 'temp (vector ""
@@ -408,7 +407,7 @@ Highlights configured time markers."
             entries)
       ;; Markers header
       (push (list 'markers-header (vector "" (concat (make-string 47 ?\s)
-                                                      (propertize "MARKERS" 'face 'shadow))))
+                                                      (propertize "MARKERS" 'face 'font-lock-keyword-face))))
             entries))
     ;; Time markers (lunch, commute, etc.)
     (cl-loop for window in windows-data
