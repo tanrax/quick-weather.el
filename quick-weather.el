@@ -378,7 +378,7 @@ Highlights configured time markers."
     (push (list 'sep1 (vector "" separator))
           entries)
     ;; Forecast header
-    (push (list 'forecast-header (vector "" (concat (make-string 47 ?\s)
+    (push (list 'forecast-header (vector "" (concat (make-string 45 ?\s)
                                                     (propertize "FORECAST" 'face 'font-lock-keyword-face))))
           entries)
     ;; Temperature range
@@ -412,7 +412,7 @@ Highlights configured time markers."
       (push (list 'sep2 (vector "" separator))
             entries)
       ;; Markers header
-      (push (list 'markers-header (vector "" (concat (make-string 48 ?\s)
+      (push (list 'markers-header (vector "" (concat (make-string 46 ?\s)
                                                       (propertize "MARKERS" 'face 'font-lock-keyword-face))))
             entries))
     ;; Time markers (lunch, commute, etc.)
